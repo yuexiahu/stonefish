@@ -43,9 +43,17 @@ OpenGLFlatOcean::OpenGLFlatOcean(GLfloat size) : OpenGLOcean(200000.f)
 
     GLint compiled;
     GLuint pcssFragment = GLSLShader::LoadShader(GL_FRAGMENT_SHADER, "lighting.frag", "", &compiled);
+    // lighting.frag defines the light contribution helpers, which reference
+    // ShadingModel, so every program that links lighting.frag must also link a
+    // shading model or glLinkProgram fails with "unresolved reference to
+    // function `ShadingModel'".  The material shaders pair the two; the ocean
+    // programs did not, which broke the rendering pipeline on drivers that do
+    // not discard unreferenced functions before linking.
+    GLuint shadingFragment = GLSLShader::LoadShader(GL_FRAGMENT_SHADER, "blinnPhong.frag", "", &compiled);
 	std::vector<GLuint> precompiled;
     precompiled.push_back(OpenGLAtmosphere::getAtmosphereAPI());
     precompiled.push_back(pcssFragment);
+    precompiled.push_back(shadingFragment);
 
     //Surface rendering
     std::vector<GLSLSource> sources;
@@ -109,7 +117,10 @@ OpenGLFlatOcean::OpenGLFlatOcean(GLfloat size) : OpenGLOcean(200000.f)
     
     //Backsurface rendering
 	GLuint oceanOpticsFragment = GLSLShader::LoadShader(GL_FRAGMENT_SHADER, "oceanOptics.frag", "", &compiled);
-    precompiled.pop_back();
+    // The back surface does not use lighting.frag, so drop both it and the
+    // shading model it requires before adding the optics shader.
+    precompiled.pop_back();   // blinnPhong.frag
+    precompiled.pop_back();   // lighting.frag
     precompiled.push_back(oceanOpticsFragment);
 
     sources.pop_back();

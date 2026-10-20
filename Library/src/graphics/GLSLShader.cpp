@@ -529,7 +529,6 @@ GLuint GLSLShader::LoadShader(GLenum shaderType, const std::string& filename, co
         if(*shaderCompiled == 0)
         {
             cError("Failed to compile shader: %s", sourcePath.c_str());
-#ifdef DEBUG	
             GLint infoLogLength = 0;	
             glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &infoLogLength);
             if(infoLogLength > 0)
@@ -538,7 +537,6 @@ GLuint GLSLShader::LoadShader(GLenum shaderType, const std::string& filename, co
                 glGetShaderInfoLog(shader, infoLogLength, NULL, &infoLog[0]);
                 cWarning("Shader compile log: %s", &infoLog[0]);
             }
-#endif
             shader = 0;
         }
     }
@@ -558,7 +556,6 @@ GLuint GLSLShader::CreateProgram(const std::vector<GLuint>& compiledShaders, uns
             glAttachShader(program, compiledShaders[i]);
     
     glLinkProgram(program);
-#ifdef DEBUG
     GLint infoLogLength = 0;
     glGetProgramiv(program, GL_INFO_LOG_LENGTH, &infoLogLength);
     if(infoLogLength > 0)
@@ -567,7 +564,6 @@ GLuint GLSLShader::CreateProgram(const std::vector<GLuint>& compiledShaders, uns
         glGetProgramInfoLog(program, infoLogLength, NULL, &infoLog[0]);
         cWarning("Program link log: %s", &infoLog[0]);
     }
-#endif
     glGetProgramiv(program, GL_LINK_STATUS, &programLinked);
     
     for(unsigned int i=0; i<compiledShaders.size(); ++i)

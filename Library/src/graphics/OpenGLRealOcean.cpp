@@ -72,9 +72,13 @@ OpenGLRealOcean::OpenGLRealOcean(GLfloat size, GLfloat state, SDL_mutex* hydrody
     sources.clear();
     GLint compiled;
     GLuint pcssFragment = GLSLShader::LoadShader(GL_FRAGMENT_SHADER, "lighting.frag", "", &compiled);
+    // See OpenGLFlatOcean.cpp: lighting.frag references ShadingModel, so a
+    // shading model definition must be linked into the same program.
+    GLuint shadingFragment = GLSLShader::LoadShader(GL_FRAGMENT_SHADER, "blinnPhong.frag", "", &compiled);
     std::vector<GLuint> precompiled;
     precompiled.push_back(OpenGLAtmosphere::getAtmosphereAPI());
     precompiled.push_back(pcssFragment);
+    precompiled.push_back(shadingFragment);
 
     //Surface rendering
     sources.push_back(GLSLSource(GL_VERTEX_SHADER, "qt.vert"));
@@ -144,7 +148,10 @@ OpenGLRealOcean::OpenGLRealOcean(GLfloat size, GLfloat state, SDL_mutex* hydrody
     OpenGLState::UseProgram(0);    
 
     //Back surface rendering
-    precompiled.pop_back();
+    // It does not use lighting.frag, so drop the lighting shader and the
+    // shading model it requires.
+    precompiled.pop_back();   // blinnPhong.frag
+    precompiled.pop_back();   // lighting.frag
     sources.pop_back();
     sources.push_back(GLSLSource(GL_FRAGMENT_SHADER, "oceanBacksurface.frag"));
     sources.push_back(GLSLSource(GL_FRAGMENT_SHADER, "oceanOptics.frag"));
