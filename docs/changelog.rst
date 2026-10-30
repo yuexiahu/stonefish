@@ -15,6 +15,7 @@ The changelog of the library code is presented below. **Breaking changes** were 
 - Replaced OpenMP parallelization with a proper implementation of a thread pool
 - Fixed rendering freezeing with high physics computation load
 - Fixed segmentation fault on exit, caused by particle systems
+- Fixed form drag scaling with the cube of the relative velocity instead of its square
 - *Renamed multiple symbols in the library*
 
 1.5
