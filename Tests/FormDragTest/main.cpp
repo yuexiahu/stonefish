@@ -29,28 +29,19 @@
 #include <cstdio>
 #include <string>
 #include <vector>
-#include "core/SimulationApp.h"
+#include "core/ConsoleSimulationApp.h"
 #include "core/SimulationManager.h"
 #include "entities/SolidEntity.h"
 #include "entities/forcefields/Ocean.h"
 #include "graphics/OpenGLDataStructs.h"
 
-// 无窗口的仿真环境：仅提供 SimulationApp/SimulationManager 单例，
-// 因为 Entity 构造函数需要通过应用访问名称管理器。
+// 无窗口的仿真环境：Entity 构造函数需要通过应用访问名称管理器。
+// SimulationManager 只有 BuildScenario 是纯虚函数，场景为空即可。
 class HeadlessSimulationManager : public sf::SimulationManager
 {
 public:
     HeadlessSimulationManager() : SimulationManager(60, sf::Solver::SI, sf::CollisionFilter::EXCLUSIVE) {}
     void BuildScenario() override {}
-};
-
-class HeadlessApp : public sf::SimulationApp
-{
-public:
-    HeadlessApp(sf::SimulationManager* sim) : SimulationApp("FormDragTest", "", sim) {}
-    bool hasGraphics() override { return false; }
-protected:
-    void LoopInternal() override {}
 };
 
 namespace
@@ -221,7 +212,7 @@ int main(int argc, const char* argv[])
     (void)argc; (void)argv;
 
     HeadlessSimulationManager manager;
-    HeadlessApp app(&manager);
+    sf::ConsoleSimulationApp app("FormDragTest", DATA_DIR_PATH, &manager); // 无窗口，不启动仿真循环
 
     sf::Fluid water;
     water.name = "Water";
