@@ -79,13 +79,13 @@ quadratic = vc * (-vc_n) * A
 - `SolidEntity::ComputeHydrodynamicForcesSurface`
 - `SolidEntity::CorrectHydrodynamicForces`
 
-三者均为 `public static`，不需要实体实例、不需要 `SimulationApp`。`Ocean` 构造函数不依赖 `SimulationApp`；`waves = 0` 时深度查询走平面分支，流体速度返回零向量。`PlainMesh` 可手工填充顶点与面，直接作为输入。
+三者均为 `public static`，不需要实体实例。但 `Ocean` 继承 `Entity`，其构造函数会经 `Entity` 构造函数调用 `SimulationApp::getApp()` 注册名称，因此夹具必须先构造 `ConsoleSimulationApp`（传入自建的 `SimulationManager`，不调用 `Run()`，不启动图形）。`waves = 0` 时深度查询走平面分支，流体速度返回零向量。`PlainMesh` 可手工填充顶点与面，直接作为输入。
 
 ### 夹具
 
 - 手工构造 `PlainMesh`：单位立方体、UV 球。
 - 静水 `Ocean`：`waves = 0`，海流关闭。
-- 变换取单位阵，刚体沿 +X 平动，角速度为零。
+- 刚体位姿为单位旋转加水下平移 `(0,0,10)`（水面为 `z=0`，保证 surface 路径完全浸没），速度沿 +X，角速度为零。
 
 ### 断言
 
