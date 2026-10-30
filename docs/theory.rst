@@ -52,13 +52,13 @@ where *v* and *omega* are the linear and angular velocity of the body, and *p* i
 
 Each face contributes the normal velocity component *-v_c* · *n*, multiplied by the relative velocity vector *v_c* and the face area *A*, so the accumulated term is quadratic in the relative velocity. The form drag coefficient *Cd* is therefore dimensionless and independent of speed: a value calibrated at one velocity produces correct drag at every other velocity, as in the standard drag equation.
 
-For a closed body surface and a uniform relative velocity *v_c*, the exposed faces satisfy
+For a convex closed body surface and a uniform relative velocity *v_c*, the exposed faces satisfy
 
 .. code-block:: text
 
     sum_faces( (-v_c . n) * A ) = |v_c| * A_proj
 
-In other words, after factoring out the velocity magnitude, the sum of the face areas weighted by the normal velocity component equals the projected area *A_proj*, i.e. the area of the shadow that the body casts on a plane perpendicular to *v_c* (for a sphere *A_proj* = pi * R^2). In still water and for a purely translational motion, *v_c* = -*v*, and the formula above reduces to the standard drag equation
+In other words, after factoring out the velocity magnitude, the sum of the face areas weighted by the normal velocity component equals the projected area *A_proj*. For a convex body *A_proj* is the area of the shadow that the body casts on a plane perpendicular to *v_c* (for a sphere *A_proj* = pi * R^2). For concave meshes and compound bodies the identity does not hold exactly, because some faces can be hidden behind others: *A_proj* has to be read as the projected area counted with multiplicity, i.e. every exposed face contributes its own projected area even if it is occluded from the outside. In still water and for a purely translational motion, *v_c* = -*v*, and the formula above reduces to the standard drag equation
 
 .. code-block:: text
 
@@ -72,4 +72,4 @@ The skin friction (viscous drag) is computed from the tangential component of th
 
     F_friction = rho * Cf * sum_faces( A * v_t )
 
-Both coefficients are dimensionless and independent of the velocity. They are estimated automatically from the geometry of the body and can be overridden per body axis with the ``quadratic_drag`` (form drag, quadratic) and ``viscous_drag`` (skin friction, linear) attributes of the ``<hydrodynamics>`` tag, or with the ``SetHydrodynamicCoefficients`` method. The three components of each coefficient are mixed according to the direction of the resulting force expressed in the body frame, which allows different drag to be defined for the principal axes of the body.
+Both coefficients are independent of the velocity. The form drag coefficient *Cd* is dimensionless: it scales the quadratic term above and can be calibrated at any velocity. The skin friction coefficient *Cf* is the coefficient of the linear skin friction term above; it is not claimed to be dimensionless. The coefficients are estimated automatically from the geometry of the body and can be overridden per body axis with the ``quadratic_drag`` (form drag, quadratic) and ``viscous_drag`` (skin friction, linear) attributes of the ``<hydrodynamics>`` tag, or with the ``SetHydrodynamicCoefficients`` method. The three components of each coefficient are mixed according to the direction of the resulting force expressed in the body frame, which allows different drag to be defined for the principal axes of the body.
