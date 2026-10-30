@@ -32,3 +32,6 @@ target_link_libraries(LearningTest Stonefish_test)
 
 add_executable(CableTest CableTest/main.cpp CableTest/CableTestApp.cpp CableTest/CableTestManager.cpp)
 target_link_libraries(CableTest Stonefish_test)
+
+add_executable(FormDragTest FormDragTest/main.cpp)
+target_link_libraries(FormDragTest Stonefish_test)
