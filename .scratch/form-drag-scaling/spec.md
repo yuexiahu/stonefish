@@ -1,6 +1,6 @@
 # 形式阻力按速度三次方缩放
 
-Status: ready-for-agent
+Status: done（集成分支 `spec/form-drag-scaling`，合并提交 `78a546d`）
 
 ## Problem Statement
 
