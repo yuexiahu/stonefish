@@ -28,6 +28,7 @@
 #include <cmath>
 #include <cstdio>
 #include <string>
+#include <utility>
 #include <vector>
 #include "core/ConsoleSimulationApp.h"
 #include "core/SimulationManager.h"
@@ -142,67 +143,65 @@ sf::PlainMesh* MakeSphere(float R, int stacks, int slices)
     return mesh;
 }
 
-// 刚体位于水下，无旋转，沿 +X 平动
+double Magnitude(const sf::Vector3& v)
+{
+    return v.length();
+}
+
+// 刚体位姿：单位旋转，平移到水下 10 m（水面为 z=0，保证 surface 路径完全浸没）
 sf::Transform MakeBodyTransform()
 {
     return sf::Transform(sf::Quaternion::getIdentity(), sf::Vector3(0, 0, 10));
 }
 
-// 计算修正后的形式阻力及原始形式阻力矩
-void ComputeCorrectedSubmerged(sf::Ocean* ocn, const sf::PlainMesh* mesh, double U,
-                               sf::Vector3& Fdq, sf::Vector3& Tdq)
+// 对逐面累积的形式阻力与阻力矩应用方向性系数与 0.5*rho 缩放
+std::pair<sf::Vector3, sf::Vector3> CorrectDrag(sf::Ocean* ocn, const sf::Vector3& Fdq, const sf::Vector3& Tdq)
 {
+    sf::Vector3 F = Fdq, T = Tdq;
     sf::Vector3 Fdf(0,0,0), Tdf(0,0,0);
-    sf::SolidEntity::ComputeHydrodynamicForcesSubmerged(mesh, ocn, MakeBodyTransform(), MakeBodyTransform(),
-                                                        sf::Vector3(U, 0, 0), sf::V0(), Fdq, Tdq, Fdf, Tdf);
-    sf::Vector3 Fdfc(0,0,0), Tdfc(0,0,0);
-    sf::SolidEntity::CorrectHydrodynamicForces(ocn, Fdq, Tdq, Fdfc, Tdfc,
+    sf::SolidEntity::CorrectHydrodynamicForces(ocn, F, T, Fdf, Tdf,
                                                sf::Vector3(1,1,1), sf::Vector3(1,1,1), sf::Transform::getIdentity());
+    return {F, T};
 }
 
-void ComputeCorrectedSurface(sf::Ocean* ocn, const sf::PlainMesh* mesh, double U,
-                             sf::Vector3& Fdq, sf::Vector3& Tdq)
+// 计算修正后的形式阻力与阻力矩（完全浸没路径）
+std::pair<sf::Vector3, sf::Vector3> ComputeCorrectedSubmerged(sf::Ocean* ocn, const sf::PlainMesh* mesh, double U)
+{
+    sf::Vector3 Fdq(0,0,0), Tdq(0,0,0), Fdf(0,0,0), Tdf(0,0,0);
+    sf::SolidEntity::ComputeHydrodynamicForcesSubmerged(mesh, ocn, MakeBodyTransform(), MakeBodyTransform(),
+                                                        sf::Vector3(U, 0, 0), sf::V0(), Fdq, Tdq, Fdf, Tdf);
+    return CorrectDrag(ocn, Fdq, Tdq);
+}
+
+// 计算修正后的形式阻力与阻力矩（跨水面路径）
+std::pair<sf::Vector3, sf::Vector3> ComputeCorrectedSurface(sf::Ocean* ocn, const sf::PlainMesh* mesh, double U)
 {
     sf::HydrodynamicsSettings settings;
     settings.dampingForces = true;
     settings.reallisticBuoyancy = false;
 
-    sf::Vector3 Fb(0,0,0), Tb(0,0,0), Fdf(0,0,0), Tdf(0,0,0);
+    sf::Vector3 Fb(0,0,0), Tb(0,0,0), Fdq(0,0,0), Tdq(0,0,0), Fdf(0,0,0), Tdf(0,0,0);
     sf::Scalar Swet(0), Vsub(0);
     sf::Renderable debug;
     sf::SolidEntity::ComputeHydrodynamicForcesSurface(settings, mesh, ocn, MakeBodyTransform(), MakeBodyTransform(),
                                                       sf::Vector3(U, 0, 0), sf::V0(),
                                                       Fb, Tb, Fdq, Tdq, Fdf, Tdf, Swet, Vsub, debug);
-    sf::Vector3 Fdfc(0,0,0), Tdfc(0,0,0);
-    sf::SolidEntity::CorrectHydrodynamicForces(ocn, Fdq, Tdq, Fdfc, Tdfc,
-                                               sf::Vector3(1,1,1), sf::Vector3(1,1,1), sf::Transform::getIdentity());
+    return CorrectDrag(ocn, Fdq, Tdq);
 }
 
-double Magnitude(const sf::Vector3& v)
+// 修正前的逐面形式阻力与阻力矩模长（完全浸没路径），用于检查对称体的零力矩
+std::pair<double, double> RawMagnitudesSubmerged(sf::Ocean* ocn, const sf::PlainMesh* mesh, double U)
 {
-    return v.length();
+    sf::Vector3 Fdq(0,0,0), Tdq(0,0,0), Fdf(0,0,0), Tdf(0,0,0);
+    sf::SolidEntity::ComputeHydrodynamicForcesSubmerged(mesh, ocn, MakeBodyTransform(), MakeBodyTransform(),
+                                                        sf::Vector3(U, 0, 0), sf::V0(), Fdq, Tdq, Fdf, Tdf);
+    return {Magnitude(Fdq), Magnitude(Tdq)};
 }
 
 bool OppositeToMotion(const sf::Vector3& F)
 {
     double m = Magnitude(F);
     return m > 0 && F.getX() < 0 && std::fabs(F.getY()) < 1e-3 * m && std::fabs(F.getZ()) < 1e-3 * m;
-}
-
-double RawForceMagnitudeSubmerged(sf::Ocean* ocn, const sf::PlainMesh* mesh, double U)
-{
-    sf::Vector3 Fdq(0,0,0), Tdq(0,0,0), Fdf(0,0,0), Tdf(0,0,0);
-    sf::SolidEntity::ComputeHydrodynamicForcesSubmerged(mesh, ocn, MakeBodyTransform(), MakeBodyTransform(),
-                                                        sf::Vector3(U, 0, 0), sf::V0(), Fdq, Tdq, Fdf, Tdf);
-    return Magnitude(Fdq);
-}
-
-double RawTorqueMagnitudeSubmerged(sf::Ocean* ocn, const sf::PlainMesh* mesh, double U)
-{
-    sf::Vector3 Fdq(0,0,0), Tdq(0,0,0), Fdf(0,0,0), Tdf(0,0,0);
-    sf::SolidEntity::ComputeHydrodynamicForcesSubmerged(mesh, ocn, MakeBodyTransform(), MakeBodyTransform(),
-                                                        sf::Vector3(U, 0, 0), sf::V0(), Fdq, Tdq, Fdf, Tdf);
-    return Magnitude(Tdq);
 }
 
 } // namespace
@@ -231,8 +230,7 @@ int main(int argc, const char* argv[])
     double cubeF[3];
     for(int i=0; i<3; ++i)
     {
-        sf::Vector3 F, T;
-        ComputeCorrectedSubmerged(&ocn, cube, cubeU[i], F, T);
+        sf::Vector3 F = ComputeCorrectedSubmerged(&ocn, cube, cubeU[i]).first;
         cubeF[i] = Magnitude(F);
         checkNear(cubeF[i], cubeExpected[i], G_TOL,
                   "submerged cube U=" + std::to_string(cubeU[i]) + " m/s force [N]");
@@ -244,18 +242,36 @@ int main(int argc, const char* argv[])
     checkNear(cubeF[2] / cubeF[1], 4.0, G_TOL, "F(2U)/F(U)");
     checkNear(cubeF[0] / cubeF[1], 0.25, G_TOL, "F(0.5U)/F(U)");
 
-    std::printf("== 对称立方体绕质心的原始阻力矩应可忽略 ==\n");
+    std::printf("== 零速度：阻力与阻力矩为零且无 NaN ==\n");
     {
-        double Fmag = RawForceMagnitudeSubmerged(&ocn, cube, 1.0);
-        double Tmag = RawTorqueMagnitudeSubmerged(&ocn, cube, 1.0);
-        check(Tmag < 1e-3 * Fmag * 0.5 * 10.0,
-              "submerged cube torque about CG negligible (|T|=" + std::to_string(Tmag) + ")");
+        auto allFinite = [](const sf::Vector3& v) {
+            return std::isfinite(v.getX()) && std::isfinite(v.getY()) && std::isfinite(v.getZ());
+        };
+
+        auto [Fs, Ts] = ComputeCorrectedSubmerged(&ocn, cube, 0.0);
+        check(Magnitude(Fs) == 0.0 && allFinite(Fs),
+              "submerged cube U=0 force is zero and finite (|F|=" + std::to_string(Magnitude(Fs)) + ")");
+        check(Magnitude(Ts) == 0.0 && allFinite(Ts),
+              "submerged cube U=0 torque is zero and finite (|T|=" + std::to_string(Magnitude(Ts)) + ")");
+
+        auto [Fw, Tw] = ComputeCorrectedSurface(&ocn, cube, 0.0);
+        check(Magnitude(Fw) == 0.0 && allFinite(Fw),
+              "surface cube U=0 force is zero and finite (|F|=" + std::to_string(Magnitude(Fw)) + ")");
+        check(Magnitude(Tw) == 0.0 && allFinite(Tw),
+              "surface cube U=0 torque is zero and finite (|T|=" + std::to_string(Magnitude(Tw)) + ")");
+    }
+
+    std::printf("== 对称立方体绕质心的原始阻力矩应为零 ==\n");
+    {
+        auto [Fmag, Tmag] = RawMagnitudesSubmerged(&ocn, cube, 1.0);
+        check(Tmag <= 1e-9 * Fmag,
+              "submerged cube torque about CG is zero (expected 0, |T|=" + std::to_string(Tmag) +
+              ", |F|=" + std::to_string(Fmag) + ")");
     }
 
     std::printf("== 半径 1 m 球体，U=2 m/s ==\n");
     {
-        sf::Vector3 F, T;
-        ComputeCorrectedSubmerged(&ocn, sphere, 2.0, F, T);
+        sf::Vector3 F = ComputeCorrectedSubmerged(&ocn, sphere, 2.0).first;
         double expected = 0.5 * RHO * 1.0 * M_PI * 1.0 * 4.0; // 0.5*rho*Cd*pi*R^2*U^2
         checkNear(Magnitude(F), expected, 0.01, "submerged sphere force [N]");
         check(OppositeToMotion(F), "submerged sphere force opposes motion");
@@ -264,9 +280,8 @@ int main(int argc, const char* argv[])
     std::printf("== 全浸没立方体：surface 与 submerged 两条路径一致 ==\n");
     for(int i=0; i<3; ++i)
     {
-        sf::Vector3 Fs, Ts, Fc, Tc;
-        ComputeCorrectedSurface(&ocn, cube, cubeU[i], Fs, Ts);
-        ComputeCorrectedSubmerged(&ocn, cube, cubeU[i], Fc, Tc);
+        sf::Vector3 Fs = ComputeCorrectedSurface(&ocn, cube, cubeU[i]).first;
+        sf::Vector3 Fc = ComputeCorrectedSubmerged(&ocn, cube, cubeU[i]).first;
         double diff = Magnitude(Fs - Fc);
         double ref = Magnitude(Fc) > 1e-12 ? Magnitude(Fc) : 1.0;
         check(diff / ref < 1e-3,
